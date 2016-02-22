@@ -1,7 +1,7 @@
 {
-  "name": "slack-client",
-  "version": "2.0.2",
-  "description": "A library for creating a Slack client",
+  "name": "slack-talkus",
+  "version": "2.0.2-1",
+  "description": "(fork) A library for creating a Slack client",
   "main": "./index",
   "scripts": {
     "lint": "eslint . --ignore-path .gitignore",
@@ -16,10 +16,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git://github.com/slackhq/node-slack-client.git"
+    "url": "git://github.com/peernohell/node-slack-client.git"
   },
   "bugs": {
-    "url": "http://github.com/slackhq/node-slack-client/issues"
+    "url": "http://github.com/peernohell/node-slack-client/issues"
   },
   "dependencies": {
     "async": "^1.5.0",
