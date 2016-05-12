@@ -1,3 +1,75 @@
+### v3.1.0 (2016-05-01)
+
+  * Updates the [`lib/clients/web/facets/index.js`](/lib/clients/web/facets/index.js) to reference the new facets added in the 3.0.0 update, thanks @ekmartin
+  * Adds in a [`reminders`](/lib/clients/web/facets/reminders.js) client facet
+  * MemoryDataStore.getUserByEmail now looks at the correct part of the user object for the email, thanks @SimantovYousoufov
+  * Adds docs and examples for the data store and sending DMs, thanks @PaulAsjes!
+
+### v3.0.0 (2016-04-24)
+
+  * Adds a number of new web client API facets:
+    - [`dnd`](/lib/clients/web/facets/dnd.js)
+    - [`files.comments`](/lib/clients/web/facets/files.comments.js)
+    - [`mpim`](/lib/clients/web/facets/mpim.js)
+    - [`usergroups`](/lib/clients/web/facets/usergroups.js)
+    - [`usergroups.users`](/lib/clients/web/facets/usergroups.users.js)
+  * **BREAKING** Changes the function signatures for some facet methods:
+    - [`channels.list`](/lib/clients/web/facets/channels.js): `exclude_archived` moves to an `opts` object, instead of being a separate argument
+    - [`groups.list`](/lib/clients/web/facets/groups.js): `exclude_archived` moves to an `opts` object, instead of being a separate argument
+    - [`chat.delete`](/lib/clients/web/facets/chat.js): The `ts` and `channel` arguments are re-ordered to be alphabetical
+    - [`stars.list`](/lib/clients/web/facets/stars.js): `user` moves to an `opts` object, instead of being a separate argument
+    - [`users.list`](/lib/clients/web/facets/users.js): `presence` moves to an `opts` object, instead of being a separate argument
+  * **BREAKING** Updates the function signature for [`BaseAPIClient.prototype.makeAPICall`](/lib/clients/client.js) to take required API args and optional API args as separate params, from `makeAPICall(endpoint, optData, optCb)` to `makeAPICall(endpoint, apiArgs, apiOptArgs, optCb)`
+  * New methods are added to various facets:
+    - [`files.revokePublicURL`](/lib/clients/web/facets/files.js)
+    - [`files.sharedPublicURL`](/lib/clients/web/facets/files.js)
+    - [`team.integrationLogs`](/lib/clients/web/facets/team.js)
+    - [`team.integrationLogs`](/lib/clients/web/facets/team.js)
+
+### v2.3.0 (2016-02-28)
+
+  * Caches messages on the RTM client, to improve handling in cases where message send fails
+  * Removes the handler for the websocket level `ping` handler (not the RTM API level ping handler)
+  * Refactors the logic for handling ws send responses to a single function
+
+### v2.2.1 (2016-03-12)
+
+  * Adds an `im` alias for the `dm` facet to the web client, to match the API endpoint naming
+
+### v2.2.0 (2016-03-12)
+
+  * Adds promise support to the RTM client `send` and `sendMessage` methods
+  * Fixes the way message response callbacks work, so that the success case is only called when the websocket receives a message with a `reply_to` matching the id of the dispatched message, instead of when the ws instance signals message send success
+  * Fixes the way `getAPICallArgs` works, to correctly pull data out of the `opts` arg
+
+### v2.1.0 (2016-03-05)
+
+ * Adds promises to the Slack clients. If no callback is passed to an API call, a promise will be created and returned instead.
+ * Logs a warning if an API response with a `warning` key is received
+
+### v2.0.6 (2016-03-01)
+
+  * Fixes a crash introduce in `2.0.5` if you try and instantiate a `WebClient` without passing in any options
+
+### v2.0.5 (2016-03-01)
+
+  * Updates the way that API requests are throttled to:
+    * avoid a condition where the request queue callback could be called multiple times, causing a crash
+    * refactor the logic in `_callTransport` into multiple functions to make it easier to follow
+  * Updates dev dependencies:
+    * eslint
+    * nock
+    * eslint-config-airbnb
+
+### v2.0.4 (2016-02-28)
+
+  * Passes through the logLevel param to the getLogger function
+
+### v2.0.3 (2016-02-28)
+
+  * The RTM `AUTHENTICATED` event now also emits the `rtm.start` payload
+  * Fixes the way that loggers are instantiated and used, so that the JSDoc for `opts.logger` is correct
+
 ### v2.0.2 (2016-02-15)
 
   * Adds coveralls to the repo, to track code coverage and display a badge in the README

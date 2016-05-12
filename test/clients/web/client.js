@@ -1,4 +1,6 @@
 var expect = require('chai').expect;
+var fs = require('fs');
+var path = require('path');
 var lodash = require('lodash');
 var nock = require('nock');
 var sinon = require('sinon');
@@ -13,11 +15,34 @@ var mockTransport = function (args, cb) {
 
 describe('Web API Client', function () {
 
+  it('should add all available facets', function () {
+    var client = new WebAPIClient('test-token');
+    var facets = fs
+      .readdirSync(path.resolve('lib', 'clients', 'web', 'facets'))
+      .filter(function (file) {
+        return /\.js$/.test(file) && file !== 'index.js';
+      })
+      .map(function (file) {
+        return require('../../../lib/clients/web/facets/' + file);
+      });
+
+    // Check that all facet files have been registered:
+    facets.forEach(function (Facet) {
+      var name = new Facet().name;
+      // The 'im' facet is aliased to dm:
+      if (name === 'im') {
+        expect(client[name].name).to.equal('dm');
+      } else {
+        expect(client[name].name).to.equal(name);
+      }
+    });
+  });
+
   it('should accept supplied defaults when present', function () {
     var opts = {
       slackAPIUrl: 'test',
       userAgent: 'test',
-      transport: lodash.noop,
+      transport: lodash.noop
     };
     var client = new WebAPIClient('test-token', opts);
 
@@ -34,12 +59,12 @@ describe('Web API Client', function () {
     var args = {
       headers: {},
       statusCode: 200,
-      body: '{"test": 10}',
+      body: '{"test": 10}'
     };
 
     var client = new WebAPIClient('test-token', { transport: mockTransport });
 
-    client.makeAPICall('test', args, function (err, res) {
+    client._makeAPICall('test', args, null, function (err, res) {
       expect(res).to.deep.equal({ test: 10 });
       done();
     });
@@ -48,7 +73,7 @@ describe('Web API Client', function () {
   it('should not crash when no callback is supplied to an API request', function () {
     var client = new WebAPIClient('test-token', { transport: mockTransport });
 
-    client.makeAPICall('test', { test: 'test' });
+    client._makeAPICall('test', { test: 'test' }, null, null);
   });
 
   describe('it should retry failed or rate-limited requests', function () {
@@ -63,12 +88,12 @@ describe('Web API Client', function () {
       client = new WebAPIClient('test-token', {
         retryConfig: {
           minTimeout: 0,
-          maxTimeout: 1,
-        },
+          maxTimeout: 1
+        }
       });
       sinon.spy(client, 'transport');
 
-      client.makeAPICall('test', {}, function () {
+      client._makeAPICall('test', {}, null, function () {
         expect(client.transport.callCount).to.equal(2);
         done();
       });
