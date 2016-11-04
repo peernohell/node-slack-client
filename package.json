@@ -1,6 +1,6 @@
 {
   "name": "slack-talkus",
-  "version": "3.1.0",
+  "version": "3.1.6",
   "description": "(fork) A library for creating a Slack client",
   "main": "./index",
   "scripts": {
