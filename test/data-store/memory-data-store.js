@@ -27,6 +27,15 @@ describe('MemoryDataStore', function () {
     });
   });
 
+  describe('#getDMByUserId', function () {
+    it('should get a DM with another user when passed the id of that user', function () {
+      var dataStore = getMemoryDataStore();
+      var user = dataStore.getUserByName('bob');
+      var dm = dataStore.getDMByUserId(user.id);
+      expect(dm.id).to.equal('D0CHZQWNP');
+    });
+  });
+
   describe('#getChannelByName()', function () {
     it('should get a channel by name', function () {
       var dataStore = getMemoryDataStore();
@@ -80,6 +89,30 @@ describe('MemoryDataStore', function () {
 
     it('should return undefined if no users with name is not found', function () {
       expect(dataStore.getUserByEmail('NOTalice')).to.equal(undefined);
+    });
+  });
+
+  describe('#getUserByBotId()', function () {
+    var dataStore = getMemoryDataStore();
+
+    it('should get a bot user by bot ID', function () {
+      expect(dataStore.getUserByBotId('B0EV07BEH').id).to.equal('U0EUYE1E0');
+    });
+
+    it('should return undefined if no users with a bot id are found', function () {
+      expect(dataStore.getUserByEmail('B00000000')).to.equal(undefined);
+    });
+  });
+
+  describe('#getBotByUserId()', function () {
+    var dataStore = getMemoryDataStore();
+
+    it('should get a bot user by user ID', function () {
+      expect(dataStore.getBotByUserId('U0EUYE1E0').id).to.equal('B0EV07BEH');
+    });
+
+    it('should return undefined if no bots with a user id are found', function () {
+      expect(dataStore.getBotByUserId('U00000000')).to.equal(undefined);
     });
   });
 
