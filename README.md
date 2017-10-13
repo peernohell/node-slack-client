@@ -1,224 +1,114 @@
 # Node Library for the Slack APIs
 
-[![Build Status](https://travis-ci.org/slackhq/node-slack-client.svg?branch=master)](https://travis-ci.org/slackhq/node-slack-client)
-[![Coverage Status](https://coveralls.io/repos/github/slackhq/node-slack-client/badge.svg?branch=master)](https://coveralls.io/github/slackhq/node-slack-client?branch=master)
+[![Build Status](https://travis-ci.org/slackapi/node-slack-sdk.svg?branch=master)](https://travis-ci.org/slackapi/node-slack-sdk)
+[![codecov](https://codecov.io/gh/slackapi/node-slack-sdk/branch/master/graph/badge.svg)](https://codecov.io/gh/slackapi/node-slack-sdk)
+[![npm (scoped)](https://img.shields.io/npm/v/@slack/client.svg)](https://www.npmjs.com/package/@slack/client)
 
-## Motivation
+Read the [full documentation](https://slackapi.github.io/node-slack-sdk) for all the lovely details.
 
-This is a wrapper around the Slack [RTM](https://api.slack.com/rtm) and [Web](https://api.slack.com/web) APIs.
+This module is a wrapper around the Slack [RTM](https://api.slack.com/rtm) and [Web](https://api.slack.com/web) APIs.
 
-This library will provide the low level functionality you need to build reliable apps and projects on top of Slack's APIs. It:
-- handles reconnection logic and request retries
-- provides reasonable defaults for events and logging
-- defines a basic model layer and data-store for caching Slack RTM API responses
+It will help you build on the Slack platform, from dropping notifications in channels to developing fully interactive bots. It provides the low level functionality you need to build reliable apps and projects on top of Slack's APIs.
+It:
 
-This library does not attempt to provide application level support, e.g. regex matching and filtering of the conversation stream. If you're looking for those kinds of features, you should check out one of the great libraries built on top of this.
+ - handles reconnection logic and request retries
+ - provides reasonable defaults for events and logging
+ - defines a basic model layer and data-store for caching Slack RTM API responses
 
-## Installation
+This module does not attempt to provide application level support, _e.g._ regex matching and filtering of the
+conversation stream.
 
-```bashp
-npm install @slack/client --save
+Most Slack apps are interested in posting messages into Slack channels, and generally working with our [Web API](https://api.slack.com/web). Read on
+to learn how to use `node-slack-sdk` to accomplish these tasks. Bots, on the other hand, are a bit more complex,
+so we have them covered in [Building Bots](https://slackapi.github.io/node-slack-sdk/bots).
+
+# Installation
+Once you have a working Node.js project, you can install the Slack Developer Kit as a dependency via npm:
+
+```sh
+$ npm install @slack/client --save
 ```
 
-## Package name change!!
+# Some Examples
 
-**IMPORTANT** We're moving to NPM organizations, so going forwards the client will be published as a scoped module under the Slack organization.
+All of these examples assume that you have set up a Slack [app](https://api.slack.com/slack-apps) or
+[custom integration](https://api.slack.com/custom-integrations), and understand the basic mechanics of working with the
+Slack Platform.
 
-We'll dual-publish both `@slack/client` and `slack-client` until at least `2.1.0` is released, and possibly past that, but please switch over before then.
+## Posting a message with Incoming Webhooks
 
-## Usage
-
-* [RTM Client](#rtm-client)
-  * [Creating an RTM client](#creating-an-rtm-client)
-  * [Listen to messages](#listen-to-messages)
-  * [Send messages](#send-messages)
-  * [Data stores] (#data-stores)
-  * [Send direct messages] (#send-dms)
-  * [RTM Client Lifecycle](#rtm-client-lifecycle)
-  * [Web Client](#web-client)
-    * [Uploading a file](#uploading-a-file)
-  * [Migrating from earlier versions](#migrating-from-earlier-versions)
-  * [Models](#models)
-
-## RTM Client
-
-The [Real Time Messaging client](lib/clients/rtm) connects to [Slack's RTM API](https://api.slack.com/rtm) over a websocket.
-
-It allows you to listen for activity in the Slack team you've connected to and push simple messages back to that team over the websocket.
-
-### Creating an RTM client
+[Incoming webhooks](https://api.slack.com/incoming-webhooks) are an easy way to get notifications posted into Slack with
+a minimum of setup. You'll need to either have a custom incoming webhook set up, or an app with an incoming webhook
+added to it.
 
 ```js
+var IncomingWebhook = require('@slack/client').IncomingWebhook;
 
-var RtmClient = require('@slack/client').RtmClient;
+var url = process.env.SLACK_WEBHOOK_URL || '';
+
+var webhook = new IncomingWebhook(url);
+
+webhook.send('Hello there', function(err, header, statusCode, body) {
+  if (err) {
+    console.log('Error:', err);
+  } else {
+    console.log('Received', statusCode, 'from Slack');
+  }
+});
+```
+
+## Posting a message with Web API
+
+You'll need a Web API token to call any of the Slack Web API methods. For custom integrations, you'll get this
+[from the token generator](https://api.slack.com/docs/oauth-test-tokens), and for apps it will come as the final part
+of the [OAuth dance](https://api.slack.com/docs/oauth).
+
+Your app will interact with the Web API through the `WebClient` object, which requires an access token to operate.
+
+```js
+var WebClient = require('@slack/client').WebClient;
 
 var token = process.env.SLACK_API_TOKEN || '';
 
-var rtm = new RtmClient(token, {logLevel: 'debug'});
-rtm.start();
-
+var web = new WebClient(token);
+web.chat.postMessage('C1232456', 'Hello there', function(err, res) {
+  if (err) {
+    console.log('Error:', err);
+  } else {
+    console.log('Message sent: ', res);
+  }
+});
 ```
 
-### Capturing the `rtm.start` payload
+## Posting a message with the Real-Time Messaging API
 
-The RTM client will emit a `RTM.AUTHENTICATED` event, with the `rtm.start` payload.
-
-```js
-
-var CLIENT_EVENTS = require('@slack/client').CLIENT_EVENTS;
-
-rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, function (rtmStartData) {
-  console.log(`Logged in as ${rtmStartData.self.name} of team ${rtmStartData.team.name}, but not yet connected to a channel`);
-});
-
-```
-
-### Listen to messages
-
-```js
-
-var RTM_EVENTS = require('@slack/client').RTM_EVENTS;
-
-rtm.on(RTM_EVENTS.MESSAGE, function (message) {
-  // Listens to all `message` events from the team
-});
-
-rtm.on(RTM_EVENTS.CHANNEL_CREATED, function (message) {
-  // Listens to all `channel_created` events from the team
-});
-
-```
-
-### Send messages
-
-```js
-
-var RTM_CLIENT_EVENTS = require('@slack/client').CLIENT_EVENTS.RTM;
-
-// you need to wait for the client to fully connect before you can send messages
-rtm.on(RTM_CLIENT_EVENTS.RTM_CONNECTION_OPENED, function () {
-  // This will send the message 'this is a test message' to the channel identified by id 'C0CHZA86Q'
-  rtm.sendMessage('this is a test message', 'C0CHZA86Q', function messageSent() {
-    // optionally, you can supply a callback to execute once the message has been sent
-  });
-});
-
-```
-
-### Data stores
+Starting a bot up requires a bot token (bot tokens start with `xoxb-`),
+which can be had either creating a [custom bot](https://my.slack.com/apps/A0F7YS25R-bots) or by creating an app with a
+bot user, at the end of the [OAuth dance](https://api.slack.com/docs/oauth). If you aren't sure path is right for you,
+have a look at the [Bot Users documentation](https://api.slack.com/bot-users).
 
 ```js
 var RtmClient = require('@slack/client').RtmClient;
-
-// The memory data store is a collection of useful functions we can include in our RtmClient
-var MemoryDataStore = require('@slack/client').MemoryDataStore;
-
 var CLIENT_EVENTS = require('@slack/client').CLIENT_EVENTS;
 
-var token = process.env.SLACK_API_TOKEN;
+var bot_token = process.env.SLACK_BOT_TOKEN || '';
 
-var rtm = new RtmClient(token, {
-  // Sets the level of logging we require
-  logLevel: 'error',
-  // Initialise a data store for our client, this will load additional helper functions for the storing and retrieval of data
-  dataStore: new MemoryDataStore(),
-  // Boolean indicating whether Slack should automatically reconnect after an error response
-  autoReconnect: true,
-  // Boolean indicating whether each message should be marked as read or not after it is processed
-  autoMark: true
+var rtm = new RtmClient(bot_token);
+
+let channel;
+
+// The client will emit an RTM.AUTHENTICATED event on successful connection, with the `rtm.start` payload
+rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
+  for (const c of rtmStartData.channels) {
+	  if (c.is_member && c.name ==='general') { channel = c.id }
+  }
+  console.log(`Logged in as ${rtmStartData.self.name} of team ${rtmStartData.team.name}, but not yet connected to a channel`);
+});
+
+// you need to wait for the client to fully connect before you can send messages
+rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, function () {
+  rtm.sendMessage("Hello!", channel);
 });
 
 rtm.start();
-
-// Wait for the client to connect
-rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, function() {
-  // Get the user's name
-  var user = rtm.dataStore.getUserById(rtm.activeUserId);
-
-  // Get the team's name
-  var team = rtm.dataStore.getTeamById(rtm.activeTeamId);
-
-  // Log the slack team name and the bot's name
-  console.log('Connected to ' + team.name + ' as ' + user.name);
-});
 ```
-
-### Send Direct Messages
-```js
-var RTM_EVENTS = require('@slack/client').RTM_EVENTS;
-
-// Responds to a message with a 'hello' DM
-rtm.on(RTM_EVENTS.MESSAGE, function(message) {
-  var user = rtm.dataStore.getUserById(message.user)
-
-  var dm = rtm.dataStore.getDMByName(user.name);
-
-  rtm.sendMessage('Hello ' + user.name + '!', dm.id);
-});
-
-```
-
-### RTM Client Lifecycle
-
-The RTM client has its own lifecycle events. These reflect the different states the RTM client can be in as it connects to Slack's RTM API.
-
-The full details of the client lifecycle are in the [RTM client events file](/lib/clients/events/client.js)
-
-The most important events are:
-- `RTM_CONNECTION_OPENED`: the remote server has acked the socket and sent a `hello` message, the connection is now live and can be used to send messages
-- `DISCONNECT`: the RTM client has disconnected and will not try to reconnect again automatically
-
-## Web Client
-
-### Uploading a file
-
-See [examples/upload-a-file.js](/examples/upload-a-file.js)
-
-## Migrating from earlier versions
-
-This is an incomplete list of items to consider when you migrate from earlier versions. As issues and PRs are raised for things that don't work as expected we'll fill this out.
-
-### Models
-
-The model objects no longer provide utility functions for working with the API. This is to decouple them from the client implementation. There should be functions on each of the clients that allow you to take the same actions you took from the model via the clients instead. The most common of these are below.
-
-#### Sending a message
-
-```js
-
-channel.sendMessage('test message');
-
-```
-
-becomes
-
-```js
-
-rtmClient.sendMessage('test message', channel.id);
-
-```
-
-#### Posting a message
-
-```js
-
-channel.postMessage({
-  attachments: [...]
-});
-
-```
-
-becomes
-
-```js
-
-var data = {
-  attachments: [...]
-};
-webClient.chat.postMessage(channelId, 'test message', data, function() {});
-
-```
-
-## Copyright
-
-Copyright &copy; Slack Technologies, Inc. MIT License; see LICENSE for further details.

@@ -4,8 +4,12 @@ var path = require('path');
 var lodash = require('lodash');
 var nock = require('nock');
 var sinon = require('sinon');
+var pkginfo = require('pkginfo')(module, 'version', 'repository'); // eslint-disable-line no-unused-vars
 
 var WebAPIClient = require('../../../lib/clients/web/client');
+var retryPolicies = require('../../../lib/clients/retry-policies');
+var defaultHTTPResponseHandler =
+  require('../../../lib/clients/transports/call-transport').handleHttpResponse;
 
 
 var mockTransport = function (args, cb) {
@@ -30,8 +34,8 @@ describe('Web API Client', function () {
     facets.forEach(function (Facet) {
       var name = new Facet().name;
       // The 'im' facet is aliased to dm:
-      if (name === 'im') {
-        expect(client[name].name).to.equal('dm');
+      if (name === 'dm') {
+        expect(client[name].name).to.equal('im');
       } else {
         expect(client[name].name).to.equal(name);
       }
@@ -41,16 +45,14 @@ describe('Web API Client', function () {
   it('should accept supplied defaults when present', function () {
     var opts = {
       slackAPIUrl: 'test',
-      userAgent: 'test',
       transport: lodash.noop
     };
     var client = new WebAPIClient('test-token', opts);
 
     expect(client.slackAPIUrl).to.equal('test');
-    expect(client.userAgent).to.equal('test');
   });
 
-  it('should register facets  during construction', function () {
+  it('should register facets during construction', function () {
     var client = new WebAPIClient('test-token', { transport: lodash.noop });
     expect(client.auth).to.not.equal(undefined);
   });
@@ -65,9 +67,40 @@ describe('Web API Client', function () {
     var client = new WebAPIClient('test-token', { transport: mockTransport });
 
     client._makeAPICall('test', args, null, function (err, res) {
-      expect(res).to.deep.equal({ test: 10 });
+      expect(res.test).to.equal(10);
       done();
     });
+  });
+
+  it('should make API calls in the order they are executed', function (done) {
+    var args1 = {
+      headers: {},
+      statusCode: 200,
+      body: '{"test": 10}'
+    };
+
+    var args2 = {
+      headers: {},
+      statusCode: 200,
+      body: '{"test": 20}'
+    };
+
+    var client = new WebAPIClient('test-token', { transport: mockTransport });
+    sinon.spy(client, 'transport');
+
+    client._makeAPICall('test', args1, null, function () {
+      expect(client.transport.callCount).to.equal(1);
+      expect(client.transport.args[0][0].data.body).to.equal('{"test": 10}');
+      expect(client.transport.args.length).to.equal(1);
+    });
+    client._makeAPICall('test', args2, null, function () {
+      expect(client.transport.callCount).to.equal(2);
+      expect(client.transport.args[0][0].data.body).to.equal('{"test": 10}');
+      expect(client.transport.args[1][0].data.body).to.equal('{"test": 20}');
+      expect(client.transport.args.length).to.equal(2);
+
+    });
+    done();
   });
 
   it('should not crash when no callback is supplied to an API request', function () {
@@ -86,10 +119,7 @@ describe('Web API Client', function () {
         .reply(200, '{}');
 
       client = new WebAPIClient('test-token', {
-        retryConfig: {
-          minTimeout: 0,
-          maxTimeout: 1
-        }
+        retryConfig: retryPolicies.TEST_RETRY_POLICY
       });
       sinon.spy(client, 'transport');
 
@@ -102,7 +132,7 @@ describe('Web API Client', function () {
     it('should pause job execution in response to a 429 header', function (done) {
       nock('https://slack.com/api')
         .post('/test')
-        .reply(429, '{}', { 'X-Retry-After': 0 });
+        .reply(429, '{}', { 'retry-after': 0 });
 
       attemptAPICall(done);
     });
@@ -125,4 +155,27 @@ describe('Web API Client', function () {
 
   });
 
+});
+
+describe('Default transport', function () {
+  it('should report scope information when present', function (done) {
+    // See https://api.slack.com/docs/oauth-scopes#working_with_scopes
+    var headers = {
+      'x-oauth-scopes': 'foo, bar,baz ,qux',
+      'x-accepted-oauth-scopes': 'a, i,u ,e'
+    };
+    var body = '{"test": 10}';
+    var client = {
+      logger: function () {}
+    };
+
+    defaultHTTPResponseHandler(body, headers, client, function (err, res) {
+      expect(res).to.deep.equal({
+        test: 10,
+        scopes: ['foo', 'bar', 'baz', 'qux'],
+        acceptedScopes: ['a', 'i', 'u', 'e']
+      });
+      done();
+    });
+  });
 });
